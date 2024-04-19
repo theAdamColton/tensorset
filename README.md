@@ -24,7 +24,7 @@ is_token_whitespace_mask = (input_ids == 0) | (input_ids == 1)# Shape: batch_siz
 # logits = transformer_model(input_embeds, key_pad_mask, is_token_whitespace_mask)
 ```
 
-Notice that any place where these tensors need to be truncated or stacked or concatenated there is tedious code like this:
+Notice that any place where these tensors are truncated or stacked or concatenated there will be tedious repetitive code like this:
 
 ```python
 def truncate_inputs(hidden_states, key_pad_mask, is_token_whitespace_mask, length):

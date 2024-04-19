@@ -47,11 +47,18 @@ inputs = TensorSequence(input_ids, input_embeds, key_pad_mask, is_whitespace_mas
 truncated_inputs = inputs[:, :length]
 ```
 
-You can stack related TensorSets to create larger batches
+
+# Features
+
+Stack related TensorSets to create larger batches
 
 ```python
 sequence_length = 20
-sequence_1 = TensorSet(torch.randn(sequence_length, 512), torch.randn(sequence_length, 1024), sequence_dim=0)
+sequence_1 = TensorSet(
+                torch.randn(sequence_length, 512),
+                torch.randn(sequence_length, 1024),
+                sequence_dim=0
+            )
 sequence_2 = TensorSet(torch.randn(sequence_length, 512), torch.randn(sequence_length, 1024), sequence_dim=0)
 batch = TensorSet.stack(sequence_1, sequence_2)
 

@@ -1,8 +1,8 @@
 # tensorsequence
 
-tensorsequecne lets you perform operations on related sequences using a unified `TensorSequence` object.
+tensorsequence is a pytorch library that lets you perform operations on related sequences using a unified `TensorSequence` object.
 
-It aims to reduce the complexity of pytorch code when using sequences commonly used as inputs to transformer models:
+It aims to reduce the complexity of using multiple related sequences. Sequences like these are very commonly used as inputs to a transformer model:
 ```python
 import torch
 from torch import nn
@@ -24,7 +24,7 @@ is_token_whitespace_mask = (input_ids == 0) | (input_ids == 1)# Shape: batch_siz
 # logits = transformer_model(input_embeds, key_pad_mask, is_token_whitespace_mask)
 ```
 
-Notice that any place where these tensors need to be truncated or stacked or concatenated has repeated tediously code:
+Notice that any place where these tensors need to be truncated or stacked or concatenated there is tedious code like this:
 
 ```python
 def truncate_inputs(hidden_states, key_pad_mask, is_token_whitespace_mask, length):
@@ -36,19 +36,14 @@ def truncate_inputs(hidden_states, key_pad_mask, is_token_whitespace_mask, lengt
 truncated_inputs = truncate_inputs(hidden_states, key_pad_mask, is_token_whitespace_mask, length)
 ```
 
-
-Notice that `input_ids`, `input_embeds`, `key_pad_mask`, and `is_whitespace_mask` are all related.
+`input_ids`, `input_embeds`, `key_pad_mask`, and `is_whitespace_mask` are all related.
 They all have matching leading dimensions for batch_size and sequence length. 
-TensorSequence is a container for these related multi-dimensional sequences.
+TensorSequence is a container for these related multi-dimensional sequences. 
+TensorSequence makes this kind of manipulation very easy and ergonomic.
 
 ```python
 from tensorsequence import TensorSequence
 inputs = TensorSequence(input_ids, input_embeds, key_pad_mask, is_whitespace_mask, sequence_dim=1)
-```
-
-Common operations are now much more ergonomic.
-
-```
 truncated_inputs = inputs[:, :length]
 ```
 

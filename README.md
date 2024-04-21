@@ -65,3 +65,12 @@ batch = TensorSet.stack(sequence_1, sequence_2)
 print(batch.sequence_length) # Prints 20
 print(batch.leading_shape[0]) # This is the batch size, Prints 2
 ```
+
+# TODO
+
+* Access by lists of columns
+* default iter behavior mirroring pandas, iterating columns
+* pandas-like iterrows()
+* pad with key:value of columnd: pad value
+* drop columns
+* add column indexed item assignment

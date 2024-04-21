@@ -89,3 +89,21 @@ class TestTensorSet(unittest.TestCase):
         tscat = TensorSequence.cat((ts1, ts2))
         self.assertTrue(torch.equal(torch.cat((c11, c12), 1), tscat[0]))
         self.assertTrue(torch.equal(torch.cat((c21, c22), 1), tscat[1]))
+
+    def test_pad_value(self):
+        c1 = torch.zeros(10, 1)
+        c2 = torch.zeros(10, 1, 7)
+        ts = TensorSequence((c1, c2), sequence_dim=1)
+        padded = ts.pad(15, 1.0)
+        self.assertEqual(padded.sequence_length, 16)
+        self.assertTrue(torch.all(padded[0][:, 1:] == 1.0))
+        self.assertTrue(torch.all(padded[1][:, 1:] == 1.0))
+
+    def test_pad_value_dict(self):
+        c1 = torch.zeros(8, 3)
+        c2 = torch.zeros(8, 3, 1)
+        ts = TensorSequence(named_columns=dict(c1=c1, c2=c2), sequence_dim=1)
+        padded = ts.pad(17, value_dict=dict(c1=1.0, c2=2.0))
+        self.assertEqual(padded.sequence_length, 20)
+        self.assertTrue(torch.all(padded["c1"][:, 3:] == 1.0))
+        self.assertTrue(torch.all(padded["c2"][:, 3:] == 2.0))

@@ -179,30 +179,43 @@ class TensorSequence:
             tensorsequences, torch.stack, 0, sequence_dim + 1
         )
 
-    def pad(self, amount: int, value=-1):
+    def pad(self, amount: int, value=None, value_dict=None):
         """
         Pad all columns of this tensorsequence along the sequence dimension
+
+        The value which is used for padding is specified by `value` or `value_dict`
+
+        value: a single number
+        value_dict: a dict which maps column_name to value.
+            To associate a padding value with an unnamed column, use a integer key.
+            Otherwise, use a string key.
         """
         assert amount >= 0
         padding = []
-        full = lambda shape: torch.full(
+        full = lambda shape, value: torch.full(
             shape,
             value,
             dtype=c.dtype,
             device=c.device,
         )
-        for c in self.columns:
+
+        if value is None and value_dict is None:
+            raise ValueError("either value or value_dict must be specified")
+
+        get_value = lambda key: value if value is not None else value_dict[key]
+
+        for i, c in enumerate(self.columns):
             pad_shape = list(c.shape)
             pad_shape[self.sequence_dim] = amount
 
-            pad_col = full(pad_shape)
+            pad_col = full(pad_shape, get_value(i))
             padding.append(pad_col)
 
         named_padding = {}
         for k, c in self.named_columns.items():
             pad_shape = list(c.shape)
             pad_shape[self.sequence_dim] = amount
-            pad_col = full(pad_shape)
+            pad_col = full(pad_shape, get_value(k))
             named_padding[k] = pad_col
         padding = TensorSequence(padding, named_padding, self.sequence_dim)
         return TensorSequence.cat([self, padding])

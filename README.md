@@ -43,7 +43,7 @@ TensorSequence makes this kind of manipulation very easy and ergonomic.
 
 ```python
 from tensorsequence import TensorSequence
-inputs = TensorSequence(input_ids, input_embeds, key_pad_mask, is_whitespace_mask, sequence_dim=1)
+inputs = TensorSequence((input_ids, input_embeds, key_pad_mask, is_whitespace_mask), sequence_dim=1)
 truncated_inputs = inputs.iloc[:, :length]
 ```
 
@@ -54,16 +54,31 @@ Stack related TensorSets to create larger batches
 
 ```python
 sequence_length = 20
-sequence_1 = TensorSet(
-                torch.randn(sequence_length, 512),
-                torch.randn(sequence_length, 1024),
+sequence_1 = TensorSequence(
+                (torch.randn(sequence_length, 512),
+                torch.randn(sequence_length, 1024)),
                 sequence_dim=0
             )
-sequence_2 = TensorSet(torch.randn(sequence_length, 512), torch.randn(sequence_length, 1024), sequence_dim=0)
-batch = TensorSet.stack(sequence_1, sequence_2)
+sequence_2 = TensorSequence(
+                (torch.randn(sequence_length, 512),
+                 torch.randn(sequence_length, 1024)),
+                 sequence_dim=0)
+batch = TensorSequence.stack(sequence_1, sequence_2)
 
 print(batch.sequence_length) # Prints 20
 print(batch.leading_shape[0]) # This is the batch size, Prints 2
+```
+
+Pad TensorSets with a specific amount of padding along the sequence dimension
+```python
+sequence_length = 20
+sequence = TensorSequence(
+                (torch.randn(sequence_length, 512), torch.randn(sequence_length, 1024)),
+                sequence_dim=0
+            )
+pad_value = -200
+padded_sequence = sequence.pad(44, pad_value)
+print(padded_sequence.sequence_length) # prints 64
 ```
 
 # TODO
@@ -71,6 +86,5 @@ print(batch.leading_shape[0]) # This is the batch size, Prints 2
 * Access by lists of columns
 * default iter behavior mirroring pandas, iterating columns
 * pandas-like iterrows()
-* pad with key:value of columnd: pad value
 * drop columns
 * add column indexed item assignment

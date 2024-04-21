@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="tensorsequence",
-    version="0.2.0",
+    version="0.2.1",
     description="manipulate sequences of tensors",
     author="Adam Colton",
     url="https://github.com/theAdamColton/tensorsequence",

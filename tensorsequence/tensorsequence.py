@@ -53,6 +53,17 @@ def validate_input_columns(columns, sequence_dim):
                 )
 
 
+class _IlocIndexer:
+    def __init__(self, tensorsequence):
+        self.tensorsequence = tensorsequence
+
+    def __getitem__(self, key):
+        return TensorSequence(
+            list(c[key] for c in self.tensorsequence.columns),
+            {k: c[key] for k, c in self.tensorsequence.named_columns.items()},
+        )
+
+
 class TensorSequence:
     """
     A small wrapper allowing manipulation of a set of columns,
@@ -102,11 +113,24 @@ class TensorSequence:
     def num_columns(self):
         return len(self.all_columns)
 
+    @property
+    def iloc(self):
+        """
+        Index into the rows of all of the columns of this tensorset.
+        """
+        return _IlocIndexer(self)
+
     def __getitem__(self, key):
-        return TensorSequence(
-            list(c[key] for c in self.columns),
-            {k: c[key] for k, c in self.named_columns.items()},
-        )
+        """
+        Access the columns of this tensorset, using either integer keys (to access self.columns)
+            or string keys (to access self.named_columns)
+        """
+        if isinstance(key, str):
+            return self.named_columns[key]
+        elif isinstance(key, int):
+            return self.columns[key]
+        else:
+            raise ValueError(key)
 
     @staticmethod
     def _run_func(tensorsequences, func, axis=None, new_sequence_dim=None):

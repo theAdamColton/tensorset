@@ -44,7 +44,7 @@ TensorSequence makes this kind of manipulation very easy and ergonomic.
 ```python
 from tensorsequence import TensorSequence
 inputs = TensorSequence(input_ids, input_embeds, key_pad_mask, is_whitespace_mask, sequence_dim=1)
-truncated_inputs = inputs[:, :length]
+truncated_inputs = inputs.iloc[:, :length]
 ```
 
 
@@ -63,5 +63,5 @@ sequence_2 = TensorSet(torch.randn(sequence_length, 512), torch.randn(sequence_l
 batch = TensorSet.stack(sequence_1, sequence_2)
 
 print(batch.sequence_length) # Prints 20
-print(batch.leading_shape[0]) # Prints 2
+print(batch.leading_shape[0]) # This is the batch size, Prints 2
 ```

@@ -107,3 +107,15 @@ class TestTensorSet(unittest.TestCase):
         self.assertEqual(padded.sequence_length, 20)
         self.assertTrue(torch.all(padded["c1"][:, 3:] == 1.0))
         self.assertTrue(torch.all(padded["c2"][:, 3:] == 2.0))
+
+    def test_to_device(self):
+        c1 = torch.zeros(8, 3)
+        c2 = torch.zeros(8, 3, 1)
+        ts = TensorSequence(named_columns=dict(c1=c1, c2=c2), sequence_dim=1)
+        self.assertEqual((8, 3), ts.leading_shape)
+        self.assertEqual(3, ts.sequence_length)
+        self.assertEqual(1, ts.sequence_dim)
+        ts = ts.to_device("cpu")
+        self.assertEqual((8, 3), ts.leading_shape)
+        self.assertEqual(3, ts.sequence_length)
+        self.assertEqual(1, ts.sequence_dim)

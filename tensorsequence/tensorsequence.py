@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Dict
+from typing import Dict, Union
 import torch
 
 
@@ -58,17 +58,79 @@ class _IlocIndexer:
         self.tensorsequence = tensorsequence
 
     def __getitem__(self, key):
-        return TensorSequence(
+        return TensorSet(
             list(c[key] for c in self.tensorsequence.columns),
             {k: c[key] for k, c in self.tensorsequence.named_columns.items()},
         )
 
 
-class TensorSequence:
+class TensorSet:
+    """
+    A simple container of tensors in columns and named_columns
+    """
+
+    def __init__(
+        self,
+        columns: Iterable[torch.Tensor],
+        named_columns: Dict[str, torch.Tensor] = {},
+    ):
+        self.columns = list(columns)
+        self.named_columns = named_columns
+
+    @property
+    def all_columns(self):
+        return self.columns + list(self.named_columns.values())
+
+    @property
+    def num_columns(self):
+        return len(self.all_columns)
+
+    @property
+    def iloc(self):
+        """
+        Index into the rows of all of the columns of this tensorset.
+        """
+        return _IlocIndexer(self)
+
+    def __getitem__(self, key: Union[str, int]):
+        """
+        Access the columns of this tensorset, using either integer keys (to access self.columns)
+            or string keys (to access self.named_columns)
+        """
+        if isinstance(key, str):
+            return self.named_columns[key]
+        elif isinstance(key, int):
+            return self.columns[key]
+        else:
+            raise ValueError(key)
+
+    def __setitem__(self, key: Union[str, int], item: torch.Tensor):
+        """
+        Assign to a new or existing column of this tensorset
+        """
+        if isinstance(key, int):
+            self.columns[key] = item
+        elif isinstance(key, str):
+            self.named_columns[key] = item
+
+    def to_device(self, device):
+        """
+        in-place
+        """
+        self.columns = [c.to(device) for c in self.columns]
+        self.named_columns = {k: c.to(device) for k, c in self.named_columns.items()}
+        return self
+
+
+class TensorSequence(TensorSet):
     """
     A small wrapper allowing manipulation of a set of columns,
-    each column with the same sequence length (rows)
+    each column with the same leading shape. The leading shape
+    of a tensor is it's dimensions up to and including the sequence length dimension.
 
+    Because of the consistent leading dimensions, TensorSequence
+    supports sequence oriented transforms like concatenation
+    and stacking and padding.
     """
 
     def __init__(
@@ -86,16 +148,11 @@ class TensorSequence:
          where the ellipses indicates any number of trailing dims which don't have to match
          and the B dimension is matching across all columns.
         """
-        validate_input_columns(
-            list(columns) + list(named_columns.values()), sequence_dim
-        )
-        self.columns = list(columns)
+        columns = list(columns)
+        validate_input_columns(columns + list(named_columns.values()), sequence_dim)
+        self.columns = columns
         self.named_columns = named_columns
         self.sequence_dim = sequence_dim
-
-    @property
-    def all_columns(self):
-        return self.columns + list(self.named_columns.values())
 
     @property
     def sequence_length(self):
@@ -108,29 +165,6 @@ class TensorSequence:
         if len(self.all_columns) == 0:
             return tuple()
         return self.all_columns[0].shape[: self.sequence_dim + 1]
-
-    @property
-    def num_columns(self):
-        return len(self.all_columns)
-
-    @property
-    def iloc(self):
-        """
-        Index into the rows of all of the columns of this tensorset.
-        """
-        return _IlocIndexer(self)
-
-    def __getitem__(self, key):
-        """
-        Access the columns of this tensorset, using either integer keys (to access self.columns)
-            or string keys (to access self.named_columns)
-        """
-        if isinstance(key, str):
-            return self.named_columns[key]
-        elif isinstance(key, int):
-            return self.columns[key]
-        else:
-            raise ValueError(key)
 
     @staticmethod
     def _run_func(tensorsequences, func, axis=None, new_sequence_dim=None):
@@ -220,10 +254,6 @@ class TensorSequence:
         padding = TensorSequence(padding, named_padding, self.sequence_dim)
         return TensorSequence.cat([self, padding])
 
-    def to_device(self, device):
-        """
-        in-place
-        """
-        self.columns = [c.to(device) for c in self.columns]
-        self.named_columns = {k: c.to(device) for k, c in self.named_columns.items()}
-        return self
+    def __setitem__(self, key: Union[str, int], value: torch.Tensor):
+        validate_input_columns(self.all_columns + [value], self.sequence_dim)
+        super().__setitem__(key, value)

@@ -50,7 +50,7 @@ truncated_inputs = inputs.iloc[:, :length]
 
 # Features
 
-Stack related TensorSets to create larger batches
+Stack related TensorSequences to create larger batches
 
 ```python
 sequence_length = 20
@@ -69,7 +69,7 @@ print(batch.sequence_length) # Prints 20
 print(batch.leading_shape[0]) # This is the batch size, Prints 2
 ```
 
-Pad TensorSets with a specific amount of padding along the sequence dimension
+Pad TensorSequences with a specific amount of padding along the sequence dimension
 ```python
 sequence_length = 20
 sequence = TensorSequence(

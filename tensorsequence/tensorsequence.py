@@ -147,6 +147,26 @@ class _IlocIndexer:
         )
 
 
+def _repr_column_shape(col):
+    if col.is_nested:
+        ndim = col.ndim
+
+        s = "nested_tensor.Size(["
+        for i in range(ndim):
+            try:
+                size = str(col.size(i))
+            except:
+                size = "irregular"
+            s += size
+            if i < ndim - 1:
+                s += ", "
+        s += "])"
+        return s
+
+    else:
+        return str(col.shape)
+
+
 class TensorSet:
     """
     A simple container of tensors in columns and named_columns
@@ -166,14 +186,14 @@ class TensorSet:
             s += "  columns:\n"
 
             s += "\n".join(
-                f"    index: {i}, shape: {c.shape}, dtype: {c.dtype}"
+                f"    index: {i}, shape: {_repr_column_shape(c)}, dtype: {c.dtype}"
                 for i, c in enumerate(self.columns)
             )
             s += "\n"
         if len(self.named_columns) > 0:
             s += "  named_columns:\n"
             s += "\n".join(
-                f"    name: {n}, shape: {c.shape}, dtype: {c.dtype}"
+                f"    name: {n}, shape: {_repr_column_shape(c)}, dtype: {c.dtype}"
                 for n, c in self.named_columns.items()
             )
             s += "\n"

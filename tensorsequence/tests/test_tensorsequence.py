@@ -35,7 +35,7 @@ class TestTensorSet(unittest.TestCase):
         self.assertEqual(seq.leading_shape, (7, 5, 3))
 
         batch_size = 13
-        stacked = ts.stack((seq for _ in range(batch_size)))
+        stacked = ts.stack(list(seq for _ in range(batch_size)))
 
         self.assertEqual(3, stacked.sequence_dim)
         self.assertEqual((batch_size, 7, 5, 3), stacked.leading_shape)
@@ -139,3 +139,14 @@ class TestTensorSet(unittest.TestCase):
         self.assertEqual(2, c1.size(0))
         self.assertEqual(2, c2.size(0))
         self.assertEqual(16, c2.size(-1))
+
+    def test_repr_nt(self):
+        seq1 = ts.TensorSequence(
+            torch.empty(10, 13), torch.empty(10, 13, 16), sequence_dim=1
+        )
+        seq2 = ts.TensorSequence(
+            torch.empty(10, 4), torch.empty(10, 4, 16), sequence_dim=1
+        )
+        stacked = ts.stack_nt((seq1, seq2))
+        s = repr(stacked)
+        print(s)

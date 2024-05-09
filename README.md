@@ -24,7 +24,7 @@ is_token_whitespace_mask = (input_ids == 0) | (input_ids == 1)# Shape: batch_siz
 # logits = transformer_model(input_embeds, key_pad_mask, is_token_whitespace_mask)
 ```
 
-Notice that any place where these tensors are truncated or stacked or concatenated there will be tedious repetitive code like this:
+Notice wherever these tensors are truncated or stacked or concatenated there will be tedious repetitive code like this:
 
 ```python
 def truncate_inputs(hidden_states, key_pad_mask, is_token_whitespace_mask, length):
@@ -36,14 +36,14 @@ def truncate_inputs(hidden_states, key_pad_mask, is_token_whitespace_mask, lengt
 truncated_inputs = truncate_inputs(hidden_states, key_pad_mask, is_token_whitespace_mask, length)
 ```
 
-`input_ids`, `input_embeds`, `key_pad_mask`, and `is_whitespace_mask` are all related.
+This repetitive code can be avoided. `input_ids`, `input_embeds`, `key_pad_mask`, and `is_whitespace_mask` are all related.
 They all have matching leading dimensions for batch_size and sequence length. 
-TensorSequence is a container for these related multi-dimensional sequences. 
-TensorSequence makes this kind of manipulation very easy and ergonomic.
+
+TensorSequence is a container for these related multi-dimensional sequences, making this kind of manipulation very easy and ergonomic.
 
 ```python
-from tensorsequence import TensorSequence
-inputs = TensorSequence((input_ids, input_embeds, key_pad_mask, is_whitespace_mask), sequence_dim=1)
+import tensorsequence as ts
+inputs = ts.TensorSequence((input_ids, input_embeds, key_pad_mask, is_whitespace_mask), sequence_dim=1)
 truncated_inputs = inputs.iloc[:, :length]
 ```
 
@@ -54,16 +54,16 @@ Stack related TensorSequences to create larger batches
 
 ```python
 sequence_length = 20
-sequence_1 = TensorSequence(
+sequence_1 = ts.TensorSequence(
                 (torch.randn(sequence_length, 512),
                 torch.randn(sequence_length, 1024)),
                 sequence_dim=0
             )
-sequence_2 = TensorSequence(
+sequence_2 = ts.TensorSequence(
                 (torch.randn(sequence_length, 512),
                  torch.randn(sequence_length, 1024)),
                  sequence_dim=0)
-batch = TensorSequence.stack(sequence_1, sequence_2)
+batch = ts.stack((sequence_1, sequence_2))
 
 print(batch.sequence_length) # Prints 20
 print(batch.leading_shape[0]) # This is the batch size, Prints 2
@@ -72,7 +72,7 @@ print(batch.leading_shape[0]) # This is the batch size, Prints 2
 Pad TensorSequences with a specific amount of padding along the sequence dimension
 ```python
 sequence_length = 20
-sequence = TensorSequence(
+sequence = ts.TensorSequence(
                 (torch.randn(sequence_length, 512), torch.randn(sequence_length, 1024)),
                 sequence_dim=0
             )

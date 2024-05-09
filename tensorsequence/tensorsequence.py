@@ -3,7 +3,7 @@ from typing import Dict, Union
 import torch
 
 
-def validate_columns(tensorsets):
+def _validate_columns(tensorsets):
     if len(tensorsets) == 0:
         return
 
@@ -24,11 +24,11 @@ def validate_columns(tensorsets):
             )
 
 
-def validate_tensor_sets_broadcastable(tensorsequences):
+def _validate_tensor_sets_broadcastable(tensorsequences):
     if len(tensorsequences) == 0:
         return
 
-    validate_columns(tensorsequences)
+    _validate_columns(tensorsequences)
 
     sequence_dim = tensorsequences[0].sequence_dim
 
@@ -47,7 +47,7 @@ def validate_tensor_sets_broadcastable(tensorsequences):
                 raise ValueError("Tensor sets have mismatched leading dimensions!")
 
 
-def validate_input_columns(columns, sequence_dim):
+def _validate_input_columns(columns, sequence_dim):
     if len(columns) == 0:
         return
     shape = columns[0].shape[: sequence_dim + 1]
@@ -80,7 +80,7 @@ def _col_apply(
             [ts.named_columns[name] for ts in tensorsets], **kwargs
         )
 
-    return TensorSet(columns, named_columns)
+    return TensorSet(*columns, **named_columns)
 
 
 def cat(tensorsequences):
@@ -89,11 +89,13 @@ def cat(tensorsequences):
 
     returns a new TensorSequence with a longer sequence dimension
     """
-    validate_tensor_sets_broadcastable(tensorsequences)
+    _validate_tensor_sets_broadcastable(tensorsequences)
     sequence_dim = tensorsequences[0].sequence_dim
     tensorsequences = _col_apply(tensorsequences, torch.cat, dim=sequence_dim)
     return TensorSequence(
-        tensorsequences.columns, tensorsequences.named_columns, sequence_dim
+        *tensorsequences.columns,
+        sequence_dim=sequence_dim,
+        **tensorsequences.named_columns,
     )
 
 
@@ -111,7 +113,7 @@ def stack(tensorsequences, stack_dim=0):
     the default behavior is to place N at 0
     shape: (N ... S ...)
     """
-    validate_tensor_sets_broadcastable(tensorsequences)
+    _validate_tensor_sets_broadcastable(tensorsequences)
     sequence_dim = tensorsequences[0].sequence_dim
     if stack_dim > sequence_dim:
         raise ValueError(
@@ -119,7 +121,9 @@ def stack(tensorsequences, stack_dim=0):
         )
     tensorsequences = _col_apply(tensorsequences, torch.stack, dim=stack_dim)
     return TensorSequence(
-        tensorsequences.columns, tensorsequences.named_columns, sequence_dim + 1
+        *tensorsequences.columns,
+        sequence_dim=sequence_dim + 1,
+        **tensorsequences.named_columns,
     )
 
 
@@ -128,7 +132,7 @@ def stack_nt(tensorsets):
     stack tensorsets along the sequence dim, using nested tensors.
     This avoids needing to use tensorsequences that have matching sequence lengths
     """
-    validate_columns(tensorsets)
+    _validate_columns(tensorsets)
     return _col_apply(tensorsets, torch.nested.as_nested_tensor)
 
 
@@ -138,8 +142,8 @@ class _IlocIndexer:
 
     def __getitem__(self, key):
         return TensorSet(
-            list(c[key] for c in self.tensorsequence.columns),
-            {k: c[key] for k, c in self.tensorsequence.named_columns.items()},
+            *(c[key] for c in self.tensorsequence.columns),
+            **{k: c[key] for k, c in self.tensorsequence.named_columns.items()},
         )
 
 
@@ -150,11 +154,31 @@ class TensorSet:
 
     def __init__(
         self,
-        columns: Iterable[torch.Tensor],
-        named_columns: Dict[str, torch.Tensor] = {},
+        *columns,
+        **named_columns,
     ):
         self.columns = list(columns)
         self.named_columns = named_columns
+
+    def __repr__(self):
+        s = "TensorSet(\n"
+        if len(self.columns) > 0:
+            s += "  columns:\n"
+
+            s += "\n".join(
+                f"    index: {i}, shape: {c.shape}, dtype: {c.dtype}"
+                for i, c in enumerate(self.columns)
+            )
+            s += "\n"
+        if len(self.named_columns) > 0:
+            s += "  named_columns:\n"
+            s += "\n".join(
+                f"    name: {n}, shape: {c.shape}, dtype: {c.dtype}"
+                for n, c in self.named_columns.items()
+            )
+            s += "\n"
+        s += ")"
+        return s
 
     @property
     def all_columns(self):
@@ -214,9 +238,9 @@ class TensorSequence(TensorSet):
 
     def __init__(
         self,
-        columns: Iterable[torch.Tensor] = [],
-        named_columns: Dict[str, torch.Tensor] = {},
+        *columns,
         sequence_dim: int = 0,
+        **named_columns,
     ):
         """
         Columns do not have to have the same dype or device
@@ -228,7 +252,7 @@ class TensorSequence(TensorSet):
          and the B dimension is matching across all columns.
         """
         columns = list(columns)
-        validate_input_columns(columns + list(named_columns.values()), sequence_dim)
+        _validate_input_columns(columns + list(named_columns.values()), sequence_dim)
         self.columns = columns
         self.named_columns = named_columns
         self.sequence_dim = sequence_dim
@@ -283,9 +307,13 @@ class TensorSequence(TensorSet):
             pad_shape[self.sequence_dim] = amount
             pad_col = full(pad_shape, get_value(k))
             named_padding[k] = pad_col
-        padding = TensorSequence(padding, named_padding, self.sequence_dim)
+        padding = TensorSequence(
+            *padding,
+            sequence_dim=self.sequence_dim,
+            **named_padding,
+        )
         return cat([self, padding])
 
     def __setitem__(self, key: Union[str, int], value: torch.Tensor):
-        validate_input_columns(self.all_columns + [value], self.sequence_dim)
+        _validate_input_columns(self.all_columns + [value], self.sequence_dim)
         super().__setitem__(key, value)

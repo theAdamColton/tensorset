@@ -200,6 +200,17 @@ class TensorSet:
         s += ")"
         return s
 
+    def size(self, index: int):
+        size = None
+        for c in self.all_columns:
+            if size is None:
+                size = c.size(index)
+            elif c.size(index) != size:
+                raise ValueError(
+                    f"Given dimension {index} is irregular and does not have a size."
+                )
+        return size
+
     @property
     def all_columns(self):
         return self.columns + list(self.named_columns.values())
@@ -225,7 +236,7 @@ class TensorSet:
         elif isinstance(key, int):
             return self.columns[key]
         else:
-            raise ValueError(key)
+            raise ValueError(f"Key {key} is not an acceptable column accessor!")
 
     def __setitem__(self, key: Union[str, int], item: torch.Tensor):
         """

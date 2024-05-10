@@ -150,3 +150,17 @@ class TestTensorSet(unittest.TestCase):
         stacked = ts.stack_nt((seq1, seq2))
         s = repr(stacked)
         print(s)
+
+    def test_size(self):
+        seq = ts.TensorSequence(
+            torch.empty(10, 13, 32), torch.empty(10, 13, 16), sequence_dim=1
+        )
+        self.assertEqual(10, seq.size(0))
+        self.assertEqual(13, seq.size(1))
+
+        did_raise = False
+        try:
+            seq.size(2)
+        except:
+            did_raise = True
+        self.assertTrue(did_raise)

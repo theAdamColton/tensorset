@@ -1,12 +1,8 @@
-from collections.abc import Iterable
-from typing import Dict, Union
+from typing import Union
 import torch
 
 
 def _validate_columns(tensorsets):
-    if len(tensorsets) == 0:
-        return
-
     names = tensorsets[0].named_columns.keys()
 
     for ts in tensorsets:
@@ -24,42 +20,6 @@ def _validate_columns(tensorsets):
             )
 
 
-def _validate_tensor_sets_broadcastable(tensorsequences):
-    if len(tensorsequences) == 0:
-        return
-
-    _validate_columns(tensorsequences)
-
-    sequence_dim = tensorsequences[0].sequence_dim
-
-    if not all(ts.sequence_dim == sequence_dim for ts in tensorsequences):
-        raise ValueError("Tensor sets have different sequence dimensions!")
-
-    if len(tensorsequences[0].all_columns) == 0:
-        return
-
-    # must have matching leading dimensions up to (but not including) the sequence dim
-    shape = tensorsequences[0].all_columns[0].shape[:sequence_dim]
-
-    for ts in tensorsequences:
-        for c in ts.all_columns:
-            if c.shape[:sequence_dim] != shape:
-                raise ValueError("Tensor sets have mismatched leading dimensions!")
-
-
-def _validate_input_columns(columns, sequence_dim):
-    if len(columns) == 0:
-        return
-    shape = columns[0].shape[: sequence_dim + 1]
-    for c_i, c in enumerate(columns):
-        c_shape = c.shape[: sequence_dim + 1]
-        for i, (s, c_s) in enumerate(zip(shape, c_shape)):
-            if s != c_s:
-                raise ValueError(
-                    f"column number {c_i} has incompatible shape at dimension {i}, {s} != {c_s}"
-                )
-
-
 def _col_apply(
     tensorsets,
     func,
@@ -68,6 +28,7 @@ def _col_apply(
     """
     make a new tensorset by running func across each columns of all tensorsets
     """
+    _validate_columns(tensorsets)
     num_columns = len(tensorsets[0].columns)
     columns = []
     for i in range(num_columns):
@@ -83,56 +44,30 @@ def _col_apply(
     return TensorSet(*columns, **named_columns)
 
 
-def cat(tensorsequences):
+def cat(tensorsets, dim):
     """
-    concatenate tensorsequences along the sequence dim
+    concatenate tensorsequences along dim
 
-    returns a new TensorSequence with a longer sequence dimension
+    returns a new TensorSet
     """
-    _validate_tensor_sets_broadcastable(tensorsequences)
-    sequence_dim = tensorsequences[0].sequence_dim
-    tensorsequences = _col_apply(tensorsequences, torch.cat, dim=sequence_dim)
-    return TensorSequence(
-        *tensorsequences.columns,
-        sequence_dim=sequence_dim,
-        **tensorsequences.named_columns,
-    )
+    return _col_apply(tensorsets, torch.cat, dim=dim)
 
 
-def stack(tensorsequences, stack_dim=0):
+def stack(tensorsets, dim=0):
     """
-    stack n tensorsequences along the sequence dim, adding a new dimension at stack_dim
+    stack n tensorsequences, adding a new dimension at stack_dim
 
-    tensorsequences:
-    each tensorsequence has shape: (... S ...) where S is sequence length
-
-    returns a new TensorSequence with an additional leading dimension of size n
-    the location of the new leading dimension is specified by stack_dim
-    shape: (... N ... S ...)
-
-    the default behavior is to place N at 0
-    shape: (N ... S ...)
+    returns a new TensorSet
     """
-    _validate_tensor_sets_broadcastable(tensorsequences)
-    sequence_dim = tensorsequences[0].sequence_dim
-    if stack_dim > sequence_dim:
-        raise ValueError(
-            f"dimension to use for stacking {stack_dim} must be less than sequence dim {sequence_dim}."
-        )
-    tensorsequences = _col_apply(tensorsequences, torch.stack, dim=stack_dim)
-    return TensorSequence(
-        *tensorsequences.columns,
-        sequence_dim=sequence_dim + 1,
-        **tensorsequences.named_columns,
-    )
+    return _col_apply(tensorsets, torch.stack, dim=dim)
 
 
 def stack_nt(tensorsets):
     """
-    stack tensorsets along the sequence dim, using nested tensors.
-    This avoids needing to use tensorsequences that have matching sequence lengths
+    stack tensorsets using nested tensors
+
+    returns a new TensorSet
     """
-    _validate_columns(tensorsets)
     return _col_apply(tensorsets, torch.nested.as_nested_tensor)
 
 
@@ -174,11 +109,14 @@ class TensorSet:
 
     def __init__(
         self,
-        *columns,
-        **named_columns,
+        *columns: torch.Tensor,
+        **named_columns: torch.Tensor,
     ):
         self.columns = list(columns)
         self.named_columns = named_columns
+        for c in self.all_columns:
+            if not isinstance(c, torch.Tensor):
+                raise ValueError(f"{type(c)} is not a torch.Tensor")
 
     def __repr__(self):
         s = "TensorSet(\n"
@@ -255,59 +193,15 @@ class TensorSet:
         self.named_columns = {k: c.to(device) for k, c in self.named_columns.items()}
         return self
 
-    def to_tensorsequence(self, sequence_dim):
-        return TensorSequence(
-            *self.columns, sequence_dim=sequence_dim, **self.named_columns
-        )
-
-
-class TensorSequence(TensorSet):
-    """
-    A small wrapper allowing manipulation of a set of columns,
-    each column with the same leading shape. The leading shape
-    of a tensor is it's dimensions up to and including the sequence length dimension.
-
-    Because of the consistent leading dimensions, TensorSequence
-    supports sequence oriented transforms like concatenation
-    and stacking and padding.
-    """
-
-    def __init__(
+    def pad(
         self,
-        *columns,
-        sequence_dim: int = 0,
-        **named_columns,
+        amount: int,
+        dim: int,
+        value=None,
+        value_dict=None,
     ):
         """
-        Columns do not have to have the same dype or device
-
-        Each column has matching leading dimensions. This means that up to the sequence dimension, all of the shapes of all of the columns have to be matching.
-
-        For example, if sequence dim = 1, all columns must be shape (B, S, ...)
-         where the ellipses indicates any number of trailing dims which don't have to match
-         and the B dimension is matching across all columns.
-        """
-        columns = list(columns)
-        _validate_input_columns(columns + list(named_columns.values()), sequence_dim)
-        self.columns = columns
-        self.named_columns = named_columns
-        self.sequence_dim = sequence_dim
-
-    @property
-    def sequence_length(self):
-        if len(self.all_columns) == 0:
-            return 0
-        return self.all_columns[0].shape[self.sequence_dim]
-
-    @property
-    def leading_shape(self):
-        if len(self.all_columns) == 0:
-            return tuple()
-        return self.all_columns[0].shape[: self.sequence_dim + 1]
-
-    def pad(self, amount: int, value=None, value_dict=None):
-        """
-        Pad all columns of this tensorsequence along the sequence dimension
+        Pad all columns of this tensorsequence along dim
 
         The value which is used for padding is specified by `value` or `value_dict`
 
@@ -332,7 +226,7 @@ class TensorSequence(TensorSet):
 
         for i, c in enumerate(self.columns):
             pad_shape = list(c.shape)
-            pad_shape[self.sequence_dim] = amount
+            pad_shape[dim] = amount
 
             pad_col = full(pad_shape, get_value(i))
             padding.append(pad_col)
@@ -340,16 +234,11 @@ class TensorSequence(TensorSet):
         named_padding = {}
         for k, c in self.named_columns.items():
             pad_shape = list(c.shape)
-            pad_shape[self.sequence_dim] = amount
+            pad_shape[dim] = amount
             pad_col = full(pad_shape, get_value(k))
             named_padding[k] = pad_col
-        padding = TensorSequence(
+        padding = TensorSet(
             *padding,
-            sequence_dim=self.sequence_dim,
             **named_padding,
         )
-        return cat([self, padding])
-
-    def __setitem__(self, key: Union[str, int], value: torch.Tensor):
-        _validate_input_columns(self.all_columns + [value], self.sequence_dim)
-        super().__setitem__(key, value)
+        return cat([self, padding], dim)

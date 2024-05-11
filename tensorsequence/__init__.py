@@ -1,1 +1,1 @@
-from .tensorsequence import TensorSet, TensorSequence, cat, stack, stack_nt
+from .tensorsequence import TensorSet, cat, stack, stack_nt

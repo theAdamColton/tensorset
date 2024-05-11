@@ -1,6 +1,6 @@
-# tensorsequence
+# tensorset
 
-tensorsequence is a pytorch library that lets you perform operations on related sequences using a unified `TensorSequence` object.
+tensorset is a pytorch library that lets you perform operations on related sequences using a unified `TensorSet` object.
 
 It aims to reduce the complexity of using multiple related sequences. Sequences like these are very commonly used as inputs to a transformer model:
 ```python
@@ -27,29 +27,28 @@ is_whitespace_mask = (input_ids == 0) | (input_ids == 1)# Shape: batch_size, seq
 Notice wherever these tensors are truncated or stacked or concatenated there will be tedious repetitive code like this:
 
 ```python
-def truncate_inputs(hidden_states, key_pad_mask, is_whitespace_mask, length):
-  hidden_states = hidden_states[:, :length]
+def truncate_inputs(input_ids, key_pad_mask, is_whitespace_mask, length):
+  input_ids= input_ids[:, :length]
   key_pad_mask= key_pad_mask[:, :length]
-  is_whitespace_mask= is_whitespace_mask[:, :length, :length]
-  return hidden_states, key_pad_mask, is_whitespace_mask
+  is_whitespace_mask= is_whitespace_mask[:, :length]
+  return input_ids, key_pad_mask, is_whitespace_mask
 
-truncated_inputs = truncate_inputs(hidden_states, key_pad_mask, is_whitespace_mask, length=10)
+truncated_inputs = truncate_inputs(input_ids, key_pad_mask, is_whitespace_mask, length=10)
 ```
 
 This repetitive code can be avoided. `input_ids`, `input_embeds`, `key_pad_mask`, and `is_whitespace_mask` are all related.
 They all have matching leading dimensions for batch_size and sequence length. 
 
-TensorSequence is a container for these related multi-dimensional sequences, making this kind of manipulation very easy and ergonomic.
+TensorSet is a container for these related multi-dimensional sequences, making this kind of manipulation very easy and ergonomic.
 
 ```python
-import tensorsequence as ts
+import tensorset as ts
 length = 10
-inputs = ts.TensorSequence(
+inputs = ts.TensorSet(
                 input_ids=input_ids,
                 input_embeds=input_embeds,
                 key_pad_mask=key_pad_mask,
                 is_whitespace_mask=is_whitespace_mask,
-                sequence_dim=1
          )
 truncated_inputs = inputs.iloc[:, :length]
 print(truncated_inputs)
@@ -69,42 +68,61 @@ TensorSet(
 
 # Features
 
-Stack related TensorSequences to create larger batches
+Stack related TensorSets to create larger batches
 
 ```python
 sequence_length = 20
-sequence_1 = ts.TensorSequence(
+sequence_1 = ts.TensorSet(
                 torch.randn(sequence_length, 512),
                 torch.randn(sequence_length, 1024),
-                sequence_dim=0
             )
-sequence_2 = ts.TensorSequence(
+sequence_2 = ts.TensorSet(
                 torch.randn(sequence_length, 512),
                 torch.randn(sequence_length, 1024),
-                sequence_dim=0)
-batch = ts.stack((sequence_1, sequence_2))
+            )
+batch = ts.stack((sequence_1, sequence_2), 0)
 
-print(batch.sequence_length) # Prints 20
-print(batch.leading_shape[0]) # This is the batch size, Prints 2
+print(batch.size(1)) # This is the sequence length, prints 20
+print(batch.size(0)) # This is the batch size, prints 2
 ```
 
-Pad TensorSequences with a specific amount of padding along the sequence dimension
+Pad TensorSets with a specific amount of padding along the sequence dimension
 ```python
 sequence_length = 20
-sequence = ts.TensorSequence(
+sequence = ts.TensorSet(
                 torch.randn(sequence_length, 512),
                 torch.randn(sequence_length, 1024),
-                sequence_dim=0
             )
 pad_value = -200
-padded_sequence = sequence.pad(44, pad_value)
-print(padded_sequence.sequence_length) # prints 64
+padded_sequence = sequence.pad(44, 0, pad_value) # add 44 dims of padding along dimension 0, of pad_value
+print(padded_sequence.size(0)) # This is the new sequence length, prints 64
+```
+
+Stack TensorSets with irregular shape, using torch.nested
+```python
+# C, H, W pixel_values, and an additional binary mask
+image1 = ts.TensorSet(
+          pixel_values = torch.randn(3, 20, 305),
+          mask = torch.randn(3, 20, 305) > 0,
+        )
+image2 = ts.TensorSet(
+          pixel_values = torch.randn(3, 450, 200),
+          mask = torch.randn(3, 450, 200) > 0,
+        )
+images = ts.stack_nt([image1, image2])
+print(images)
+```
+
+output:
+```
+TensorSet(
+  named_columns:
+    name: pixel_values, shape: nested_tensor.Size([2, 3, irregular, irregular]), dtype: torch.float32
+    name: mask, shape: nested_tensor.Size([2, 3, irregular, irregular]), dtype: torch.bool
+)
 ```
 
 # TODO
 
 * Access by lists of columns
-* default iter behavior mirroring pandas, iterating columns
-* pandas-like iterrows()
-* drop columns
-* add column indexed item assignment
+* Enable operations over irregular dims that are not supported yet by torch.nested, such as mean and index select

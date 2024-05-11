@@ -1,11 +1,11 @@
 from setuptools import setup
 
 setup(
-    name="tensorsequence",
-    version="0.3.0",
-    description="manipulate sequences of tensors",
+    name="tensorset",
+    version="0.4.0",
+    description="manipulate sets of tensors",
     author="Adam Colton",
-    url="https://github.com/theAdamColton/tensorsequence",
+    url="https://github.com/theAdamColton/tensorset",
     install_requires=[
         "torch>=2.0.1",
     ],

@@ -255,6 +255,11 @@ class TensorSet:
         self.named_columns = {k: c.to(device) for k, c in self.named_columns.items()}
         return self
 
+    def to_tensorsequence(self, sequence_dim):
+        return TensorSequence(
+            *self.columns, sequence_dim=sequence_dim, **self.named_columns
+        )
+
 
 class TensorSequence(TensorSet):
     """

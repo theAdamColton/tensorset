@@ -185,12 +185,14 @@ class TensorSet:
         elif isinstance(key, str):
             self.named_columns[key] = item
 
-    def to_device(self, device):
+    def to_device(self, device, **kwargs):
         """
         in-place
         """
-        self.columns = [c.to(device) for c in self.columns]
-        self.named_columns = {k: c.to(device) for k, c in self.named_columns.items()}
+        self.columns = [c.to(device, **kwargs) for c in self.columns]
+        self.named_columns = {
+            k: c.to(device, **kwargs) for k, c in self.named_columns.items()
+        }
         return self
 
     def pad(

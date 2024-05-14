@@ -1,6 +1,6 @@
 import unittest
 import torch
-from .. import tensorsequence as ts
+from .. import tensorset as ts
 
 
 class TestTensorSet(unittest.TestCase):

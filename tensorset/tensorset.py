@@ -98,8 +98,7 @@ def _repr_column_shape(col):
         s += "])"
         return s
 
-    else:
-        return str(col.shape)
+    return str(col.shape)
 
 
 class TensorSet:
@@ -184,6 +183,27 @@ class TensorSet:
             self.columns[key] = item
         elif isinstance(key, str):
             self.named_columns[key] = item
+
+    def __delitem__(self, key: Union[str, int]):
+        """
+        deletes item based on column
+        """
+        if isinstance(key, int):
+            self.columns = self.columns.drop(key)
+        elif isinstance(key, str):
+            self.columns = self.columns.drop(key)
+
+    def __iter__(self):
+        """
+        returns an iterator
+        """
+        return iter(self.all_columns)
+
+    def __len__(self):
+        """
+        return number of columns
+        """
+        return len(self.all_columns)
 
     def to_device(self, device, **kwargs):
         """

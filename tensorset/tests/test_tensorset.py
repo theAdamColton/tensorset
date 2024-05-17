@@ -194,3 +194,53 @@ class TestTensorSet(unittest.TestCase):
         self.assertEqual(13, catted.size(1))
         self.assertEqual(132, catted[0].size(-1))
         self.assertEqual(36, catted[1].size(-1))
+
+    def test_set_item(self):
+        seq = ts.TensorSet()
+        seq["asdf"] = torch.empty(1, 1, 1)
+        self.assertEqual(1, seq.num_columns)
+        seq2 = ts.TensorSet(torch.empty(10, 10))
+
+        seq2[0] = torch.zeros(1, 1, 1)
+        self.assertEqual(seq2[0].shape, torch.zeros(1, 1, 1).shape)
+
+    def test_iter(self):
+
+        seq = ts.TensorSet(
+            torch.empty(1, 1, 1),
+            torch.empty(
+                1,
+                1,
+            ),
+            torch.empty(
+                1,
+            ),
+        )
+        iterator = iter(seq)
+        self.assertEqual(torch.empty(1, 1, 1).shape, next(iterator).shape)
+        self.assertEqual(
+            torch.empty(
+                1,
+                1,
+            ).shape,
+            next(iterator).shape,
+        )
+        self.assertEqual(
+            torch.empty(
+                1,
+            ).shape,
+            next(iterator).shape,
+        )
+
+    def test_len(self):
+        seq = ts.TensorSet(
+            torch.empty(1, 1, 1),
+            torch.empty(
+                1,
+                1,
+            ),
+            torch.empty(
+                1,
+            ),
+        )
+        self.assertEqual(len(seq), 3)

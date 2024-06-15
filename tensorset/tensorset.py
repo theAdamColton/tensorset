@@ -264,3 +264,15 @@ class TensorSet:
             **named_padding,
         )
         return cat([self, padding], dim)
+
+    def clone(self):
+        return TensorSet(
+            *(c.clone() for c in self.columns),
+            **{k: v.clone() for k, v in self.named_columns.items()},
+        )
+
+    def shallow_copy(self):
+        return TensorSet(
+            *(c for c in self.columns),
+            **{k: v for k, v in self.named_columns.items()},
+        )

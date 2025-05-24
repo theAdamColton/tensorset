@@ -205,15 +205,26 @@ class TensorSet:
         """
         return len(self.all_columns)
 
+    def apply(self, fn, *args, **kwargs):
+        """
+        apply fn in-place to all columns and named_columns
+        """
+        self.columns = [fn(c, *args, **kwargs) for c in self.columns]
+        self.named_columns = {
+            k: fn(c, *args, **kwargs) for k, c in self.named_columns.items()
+        }
+
+        return self
+
     def to_device(self, device, **kwargs):
         """
         in-place
         """
-        self.columns = [c.to(device, **kwargs) for c in self.columns]
-        self.named_columns = {
-            k: c.to(device, **kwargs) for k, c in self.named_columns.items()
-        }
-        return self
+
+        def _to_device(c):
+            return c.to(device)
+
+        return self.apply(_to_device)
 
     def pad(
         self,
@@ -233,32 +244,38 @@ class TensorSet:
             Otherwise, use a string key.
         """
         assert amount >= 0
-        padding = []
-        full = lambda shape, value: torch.full(
-            shape,
-            value,
-            dtype=c.dtype,
-            device=c.device,
-        )
 
         if value is None and value_dict is None:
             raise ValueError("either value or value_dict must be specified")
 
-        get_value = lambda key: value if value is not None else value_dict[key]
+        def _pad(key, column):
+            if value is not None:
+                pad_value = value
+            else:
+                if key not in value_dict:
+                    raise ValueError(
+                        f"Can't pad column '{key}', not in pad value dict."
+                    )
+                pad_value = value_dict[key]
 
-        for i, c in enumerate(self.columns):
-            pad_shape = list(c.shape)
-            pad_shape[dim] = amount
+            shape = list(column.shape)
+            shape[dim] = amount
 
-            pad_col = full(pad_shape, get_value(i))
-            padding.append(pad_col)
+            return torch.full(
+                shape,
+                pad_value,
+                device=column.device,
+                dtype=column.dtype,
+            )
+
+        padding = []
+        for c in self.columns:
+            padding.append(_pad(None, c))
 
         named_padding = {}
         for k, c in self.named_columns.items():
-            pad_shape = list(c.shape)
-            pad_shape[dim] = amount
-            pad_col = full(pad_shape, get_value(k))
-            named_padding[k] = pad_col
+            named_padding[k] = _pad(k, c)
+
         padding = TensorSet(
             *padding,
             **named_padding,
@@ -266,10 +283,7 @@ class TensorSet:
         return cat([self, padding], dim)
 
     def clone(self):
-        return TensorSet(
-            *(c.clone() for c in self.columns),
-            **{k: v.clone() for k, v in self.named_columns.items()},
-        )
+        return self.apply(torch.clone)
 
     def shallow_copy(self):
         return TensorSet(

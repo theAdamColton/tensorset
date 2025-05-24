@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="tensorset",
-    version="0.4.4",
+    version="0.4.5",
     description="manipulate sets of tensors",
     author="Adam Colton",
     url="https://github.com/theAdamColton/tensorset",
